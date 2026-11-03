@@ -1,0 +1,25 @@
+# Hive scales report every 4 h: land the last 4 h of readings and hand them to Snowpipe.
+name: hive-readings
+on:
+  schedule:
+    - cron: "17 */4 * * *"       # every 4 h (off the hour: GitHub delays jobs scheduled at :00)
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+concurrency: hive-readings
+jobs:
+  hive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PIPELINE_PRIVATE_KEY }}
+        run: |
+          IMAGE=ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/beegs-extract:stable
+          docker run --rm -e SNOWFLAKE_PRIVATE_KEY $IMAGE --task hive || (sleep 60 && docker run --rm -e SNOWFLAKE_PRIVATE_KEY $IMAGE --task hive)

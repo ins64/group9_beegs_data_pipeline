@@ -1,0 +1,31 @@
+# Read-only pre-flight check (run it 1 h before the defence): did the pipeline run, volumes, decisions, task graph.
+name: health-check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  SF_ACCOUNT: ZEFQCKT-WL69349
+  KEY_FILE: /tmp/snowflake_deploy.p8
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Snowflake CLI + key
+        env:
+          KEY: ${{ secrets.SNOWFLAKE_DEPLOY_PRIVATE_KEY }}
+        run: |
+          pip install -q snowflake-cli==3.31.0
+          pip install -q cryptography==43.0.3
+          KEY="$KEY" python scripts/ci/write_key.py $KEY_FILE
+      - name: Health check
+        run: |
+          snow sql --enable-templating NONE -x --account $SF_ACCOUNT --user BEEGS_DEPLOY_SVC --authenticator SNOWFLAKE_JWT \
+            --private-key-file $KEY_FILE --role BEEGS_ADMIN --warehouse BEEGS_BI_WH -f snowflake/demo/health_check.sql
+          snow sql --enable-templating NONE -x --account $SF_ACCOUNT --user BEEGS_DEPLOY_SVC --authenticator SNOWFLAKE_JWT \
+            --private-key-file $KEY_FILE --role BEEGS_ADMIN --warehouse BEEGS_BI_WH --format JSON -f snowflake/demo/health_check.sql > /tmp/hc.json || true
+          python -c "import json;[print(json.dumps(r,default=str)) for blk in json.load(open('/tmp/hc.json')) for r in (blk if isinstance(blk,list) else [blk])]" | cut -c1-400

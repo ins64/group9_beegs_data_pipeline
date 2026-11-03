@@ -1,0 +1,58 @@
+# Daily extraction (the serverless job of this architecture): runs the container on a GitHub-hosted runner.
+name: extract-daily
+on:
+  schedule:
+    # GitHub cron is UTC and best-effort: runs on the hour are often delayed or dropped under load (it happened on
+    # 3 Nov 2026: no run, so the 06:30 completeness gate failed). Off-peak minute + a fallback trigger that does
+    # nothing if the day's extraction already succeeded.
+    - cron: "17 3 * * *"         # 03:17 UTC = 04:17 Paris (winter)
+    - cron: "47 4 * * *"         # 04:47 UTC = 05:47 Paris: fallback, skipped if the first run succeeded
+  workflow_dispatch:
+    inputs:
+      run_date:
+        description: "Business date to extract (YYYY-MM-DD). Empty = yesterday. Use it to replay a day."
+        required: false
+permissions:
+  contents: read
+  packages: read
+  actions: read                  # the fallback trigger checks whether today's run already succeeded
+concurrency: extract-daily       # never two extractions at the same time
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Fallback trigger - skip if today's extraction already succeeded
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          n=$(gh run list --workflow extract-daily.yml --status success --created ">=$(date -u +%F)" --json databaseId -q length)
+          if [ "$n" -gt 0 ]; then echo "Already extracted today ($n successful run) - nothing to do."; echo "SKIP=1" >> $GITHUB_ENV; fi
+      - uses: docker/login-action@v3
+        if: env.SKIP != '1'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run internal then apis (2 attempts each, 20 min cap; tasks are idempotent so a retry is safe)
+        if: env.SKIP != '1'
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PIPELINE_PRIVATE_KEY }}
+          RUN_DATE: ${{ inputs.run_date }}
+        run: |
+          IMAGE=ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/beegs-extract:stable
+          docker pull -q $IMAGE
+          # internal files FIRST: they feed the 06:30 completeness gate and must never wait for an external API.
+          # Each task is capped (timeout) so a hanging API cannot eat the job; the run is still marked failed at
+          # the end so that an outage is visible and e-mailed. Watermarks make the next run catch up.
+          failed=""
+          for task in internal apis; do
+            for attempt in 1 2; do
+              timeout 20m docker run --rm -e SNOWFLAKE_PRIVATE_KEY -e BEEGS_RUN_DATE="$RUN_DATE" $IMAGE --task $task && break
+              if [ $attempt = 2 ]; then echo "::error::task $task failed twice"; failed="$failed $task"; break; fi
+              sleep 60
+            done
+          done
+          [ -z "$failed" ] || exit 1
