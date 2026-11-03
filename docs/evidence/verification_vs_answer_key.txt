@@ -1,0 +1,40 @@
+Answer key as of 2026-11-01
+1. Released stock (kg)
+  OK  ACACIA                                 gold=      3331.5  truth=      3331.5
+  OK  CHATAIGNIER                            gold=     14718.9  truth=     14718.9
+  OK  COLZA                                  gold=      5464.0  truth=      5464.0
+  OK  LAVANDE                                gold=     13719.4  truth=     13719.4
+  OK  MONTAGNE                               gold=      7165.0  truth=      7165.0
+  OK  TILLEUL                                gold=      5933.2  truth=      5933.2
+  OK  TOURNESOL                              gold=     18806.0  truth=     18806.0
+  OK  TOUTES_FLEURS                          gold=     40136.4  truth=     40136.4
+2. Open confirmed B2B order book (kg)
+  OK  ACACIA                                 gold=      5210.0  truth=      5210.0
+  OK  CHATAIGNIER                            gold=      2750.0  truth=      2750.0
+  OK  COLZA                                  gold=      2200.0  truth=      2200.0
+  OK  LAVANDE                                gold=      2330.0  truth=      2330.0
+  OK  MONTAGNE                               gold=      1720.0  truth=      1720.0
+  OK  TILLEUL                                gold=      1640.0  truth=      1640.0
+  OK  TOURNESOL                              gold=      2600.0  truth=      2600.0
+  OK  TOUTES_FLEURS                          gold=      8250.0  truth=      8250.0
+3. B2B service level per year
+  OK  2024                                   gold=       0.968  truth=       0.968
+  OK  2025                                   gold=      0.8464  truth=      0.8464
+  OK  2026                                   gold=      0.9578  truth=      0.9578
+4. Injected defects -> where did they go?
+  {"erp_order_lines.non_iso_date": 179, "erp_order_lines.quantity_as_french_text": 123, "erp_order_lines.status_case_space": 65, "erp_order_lines.variety_label_variant": 529, "harvest_declarations.kg_with_unit": 6, "harvest_declarations.non_iso_date": 10, "harvest_declarations.variety_label_variant": 18, "hive_events.duplicate_event": 1509, "hive_events.epoch_timestamp": 1287, "hive_events.renamed_key_WEIGHT": 438, "hive_events.sensor_zero_weight": 491, "lab_results.boolean_variant": 29, "lab_results.moisture_text_percent": 25, "lab_results.non_iso_date": 28, "lab_results.variety_label_variant": 62, "lab_results.verdict_label_variant": 21}
+  quarantined: [('hive_events', 'sensor_fault_weight', 491)]
+  OK  hive duplicates removed by dedup       gold=        1509  truth=        1509
+  OK  hive 0-kg readings quarantined         gold=         491  truth=         491
+  all other defects (labels, dates, French numbers, epoch timestamps, renamed keys) are REPAIRED in silver: the reconciliations above would be off otherwise.
+5. Backtest - decision of Monday 30 March 2026 vs what really happened
+  OK  ACACIA         predicted not red             real worst service level Apr-May = 1.0
+  OK  CHATAIGNIER    predicted not red             real worst service level Apr-May = 1.0
+  OK  COLZA          predicted RED from 2026-W18   real worst service level Apr-May = 0.85
+  OK  LAVANDE        predicted not red             real worst service level Apr-May = 0.973
+  OK  MONTAGNE       predicted not red             real worst service level Apr-May = 1.0
+  OK  TILLEUL        predicted RED from 2026-W15   real worst service level Apr-May = 0.0
+  OK  TOURNESOL      predicted not red             real worst service level Apr-May = 1.0
+  OK  TOUTES_FLEURS  predicted not red             real worst service level Apr-May = 1.0
+
+RESULT: ALL RECONCILIATIONS PASS

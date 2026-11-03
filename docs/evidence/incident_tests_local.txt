@@ -1,0 +1,21 @@
+=== INC-001  Replay of an already-loaded ERP file (forced reload) ===
+  [before] bronze_erp_rows=16510, silver_versions=16510, open_b2b_kg=26700.0, gold_rows_latest=64, gold_cum_demand_acacia_w8=6785.7, gold_computed_at=2026-11-01 14:30:23.356455+01:00
+  reloaded erp_order_lines_20261101.jsonl: 14 rows inserted AGAIN in bronze
+  dbt build: 0
+  [after ] bronze_erp_rows=16524, silver_versions=16510, open_b2b_kg=26700.0, gold_rows_latest=64, gold_cum_demand_acacia_w8=6785.7, gold_computed_at=2026-11-01 14:42:51.363369+01:00
+  RESULT: bronze +14 rows, silver/gold unchanged -> PASS (no double counting)
+
+=== INC-002  Lab export changed its columns (schema drift) ===
+  [before] bronze_erp_rows=16524, silver_versions=16510, open_b2b_kg=26700.0, gold_rows_latest=64, gold_cum_demand_acacia_w8=6785.7, gold_computed_at=2026-11-01 14:42:51.363369+01:00
+  loaded lab_results_lab_apinov_BROKEN.csv: 60 rows, columns 'moisture'/'result' unknown -> moisture_pct & verdict NULL
+  dbt build exit code: 1
+    13:42:56  49 of 117 FAIL 2 recent_reject_share_stg_lims__lab_results_3__0_05 ............. [FAIL 2 in 0.09s]
+    13:43:03  [ERROR]: in test recent_reject_share_stg_lims__lab_results_3__0_05 (models/staging/_staging.yml)
+  [after ] bronze_erp_rows=16524, silver_versions=16510, open_b2b_kg=26700.0, gold_rows_latest=64, gold_cum_demand_acacia_w8=6785.7, gold_computed_at=2026-11-01 14:42:51.363369+01:00
+  RESULT: build failed=True, gold refreshed=False -> PASS (bad data stopped before gold)
+  quarantine: []
+
+  RECOVERY: the lab re-sends the file with the agreed columns -> latest load per sample_id wins
+  dbt build: 0
+  [recovered] bronze_erp_rows=16524, silver_versions=16510, open_b2b_kg=26700.0, gold_rows_latest=64, gold_cum_demand_acacia_w8=6785.7, gold_computed_at=2026-11-01 14:43:16.700414+01:00
+  quarantine now: [(0,)]
