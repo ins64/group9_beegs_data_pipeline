@@ -1,7 +1,7 @@
 # 11 · Live demo (5 minutes) - step-by-step guide
 
 > Presenter: **Philomène**. Everything runs on the real Snowflake account, in Snowsight, with your own user and the role `BEEGS_ADMIN`.
-> Script: `snowflake/demo/live_demo.sql`. It was rehearsed end to end on the real account by the GitHub workflow `demo-rehearsal` (run "rehearsal1", 2 Nov 2026: broken file loaded → run FAILED in `T_DBT_BUILD` → GOLD timestamp unchanged → fixed file → run SUCCESS).
+> Script: `snowflake/demo/live_demo.sql`. It was rehearsed end to end on the real account by the GitHub workflow `demo-rehearsal` (broken file loaded → run FAILED in `T_DBT_BUILD` → GOLD timestamp unchanged → fixed file → run SUCCESS).
 
 **The story in one sentence:** *"Our data lands every night. Now a lab sends a broken file, live. Watch: the pipeline refuses it, and the buyer still sees correct figures."*
 
@@ -20,7 +20,7 @@
    - put `_live` back.
 
    ⚠️ **Each tag can only be used once.** Snowpipe never loads the same file name twice.
-3. **Create the worksheet.** Snowsight → *Projects* → *Worksheets* → **+** → *SQL Worksheet*. Name it `BeeGs live demo`. Paste the content of `snowflake/demo/live_demo.sql` from GitHub.
+3. **Create the worksheet.** Snowsight → *Workspaces* → **+** → *SQL file*. Name it `BeeGs live demo`. Paste the content of `snowflake/demo/live_demo.sql` from GitHub.
 4. Increase the font size of the browser (Ctrl/Cmd + `+`, 125 %): the jury must read the results.
 
 ## B. One hour before the defence (5 min)
@@ -30,8 +30,8 @@
    - the Snowflake task graph has run at 06:30. Step 1 of the script shows it.
 2. **Open 3 browser tabs, in this order:**
    - **Tab A**: the worksheet `BeeGs live demo`. Top right: role **BEEGS_ADMIN**, warehouse **BEEGS_PIPELINE_WH**.
-   - **Tab B**: *Monitoring* → *Task History* → click **T_ROOT** → tab **Graph** (or *Run history*).
-   - **Tab C**: *Projects* → *Streamlit* → **COVERAGE_COCKPIT**. Open it once now, so it is warm.
+   - **Tab B**: *Transformation* → *Tasks* → click **T_ROOT** → tab **Graph** (or *Run history*).
+   - **Tab C**: search for **COVERAGE_COCKPIT** in Snowsight. Open it once now, so it is warm.
 3. In tab A, run the three `USE …` lines and the STEP 1 query once. This wakes the warehouse, so there is no cold start during the demo.
 
 > To run one block: select its lines with the mouse, then **Ctrl + Enter** (Windows) / **Cmd + Enter** (Mac). Never use "Run all".
@@ -46,22 +46,22 @@
 | 1:00 | Tab A | Run the `SELECT MAX(computed_at)` query (gold timestamp). | "Let's note when our decision table was last computed: remember this time." |
 | 1:15 | Tab A | Run the bronze query `… BROKEN_live …`. If it returns no row, wait 15 s and run it again. | "Snowpipe loaded the 60 rows in seconds, but the verdict and moisture columns are empty. In a naive pipeline, these lots would disappear from our supply and the buyer would panic-buy honey." |
 | **1:45** | Tab A | Run **STEP 3**: `EXECUTE TASK BEEGS.OPS.T_ROOT;` Then go to **tab B** and refresh. | "Instead of waiting for tomorrow 6:30, I launch the daily pipeline now: load, completeness check, dbt build with 79 tests, and a finalizer that always logs the run." |
-| **2:00** | Tab C | Show the cockpit: the KPI row, the RED line for **ACACIA**, the heatmap, the recommended action. | "While it runs, this is what the Head of Sourcing opens every Monday: ACACIA turns red in week 48, 3.5 tonnes short. Seen 4 weeks ahead, the action is to buy traceable partner stock, about €27 k, rather than a cheaper spot import. She can record her decision here, and we keep it to measure later what worked." |
+| **2:00** | Tab C | Show the cockpit: the KPI row, the RED line for **ACACIA**, the heatmap, the recommended action. | "While it runs, this is what the Head of Sourcing opens every Monday: Acacia is red, and the action is to buy traceable partner stock rather than a cheaper spot import. She can record her decision here, and we keep it to measure later what worked." |
 | **3:30** | Tab B | Refresh. `T_LOAD_BATCH` and `T_CHECK_COMPLETE` are green, **`T_DBT_BUILD` is red**, and `T_FINALIZER` is green. | "dbt refused the data: a test checks the share of rejected rows per file. One hundred percent of this file is rejected, so the build stops before gold. The task retried once, then failed." |
 | 4:00 | Tab A | Run **STEP 5**: task history, `PIPELINE_RUN_LOG` (status `FAILED`, cause `T_DBT_BUILD`), then the gold timestamp. | "The finalizer logged the failure and e-mailed the data team. And the decision table has the same timestamp as before: Monday's figures were never overwritten by bad data." |
 | **4:30** | - | Conclude. | "Recovery: the lab re-sends the file in the agreed format, the next run is green. Every step is idempotent, so we can replay any day without double counting. We test this scenario automatically in a GitHub workflow." |
 | 5:00 | | End. Back to the slides. | |
 
-> **The cockpit refreshes every day, the slides do not.** The slides show the decision of Monday 1 Nov 2026 (ACACIA RED in W48, 3.5 t short). The cockpit shows the latest run, so on the day of the defence the week and the tonnage can differ slightly (on 3 Nov: W49, 3.9 t). Say it in one sentence: "The slide is Monday's decision; the cockpit is this morning's refresh."
+> **The cockpit refreshes every day, the slides do not.** The slides show the decision of 1 Nov 2026 (ACACIA RED in W48, 3.5 t short). The cockpit shows the latest run, so on the day of the defence the week and the tonnage can differ slightly (on 3 Nov: W49, 3.9 t). Say it in one sentence: "The slide shows the decision of 1 Nov; the weeks and the tonnage move because the decision is recomputed daily and the 8-week horizon shifts every Monday."
 
 ## D. If something goes wrong (plan B)
 
 | Problem | What to do |
 |---|---|
 | The bronze query returns nothing after 30 s (Snowpipe slower than usual). | Say "Snowpipe loads within about a minute", go to the cockpit (2:00), and come back to the query later. |
-| `T_DBT_BUILD` is still running at 3:30. | Show the cockpit a bit longer. The full graph takes about 75 s, plus the retry of the failing task. |
+| `T_DBT_BUILD` is still running at 3:30. | Show the cockpit a bit longer. The full graph takes about 1 min, plus 2 retries of the failing task. |
 | The cockpit does not open. | Run the STEP 4 query in tab A: it shows the same table. |
-| Snowflake or the Wi-Fi is down. | GitHub → Actions → **demo-rehearsal** (run "rehearsal1") or **incident-drill** (run "drill4"). Open the log: the same scenario ran on the real account, with the same output. |
+| Snowflake or the Wi-Fi is down. | GitHub → Actions → **demo-rehearsal** (the run of the 4 Nov rehearsal). Open the log: the same scenario ran on the real account, with the same output. |
 | You ran the demo files by mistake before the defence. | Run **demo-prepare** with a new tag (`live2`) and replace `_live` with `_live2` in the worksheet. |
 
 ## E. After the defence (2 min)

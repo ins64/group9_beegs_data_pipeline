@@ -132,8 +132,8 @@ icon(1636, 114, "googlecloud", size=28)
 icon(2470, 114, "streamlit", size=28)
 
 # ------------------------------------------------------------------ sources
-text(50, 150, "REAL, external (free APIs)", size=15, color=GREEN)
-box(50, 180, 320, 62, "Open-Meteo archive + forecast", "weather, 12 apiaries (JSON) · down: INC-004", bg="#e9f5e1", stroke=GREEN)
+text(50, 150, "REAL, external (4 free APIs + 1 report)", size=15, color=GREEN)
+box(50, 180, 320, 62, "Open-Meteo archive + forecast", "12 apiaries · no reply to GitHub: INC-004", bg="#e9f5e1", stroke=GREEN)
 tag(50, 180, 320, "cloud", color=GREEN)
 box(50, 252, 320, 62, "Frankfurter = ECB rates", "EUR->HUF, RON, USD, PLN (JSON)", bg="#e9f5e1", stroke=GREEN)
 tag(50, 252, 320, "euro", color=GREEN)
@@ -186,7 +186,7 @@ box(940, 150, 1210, 95, "Task graph 06:30 Paris:  ROOT -> LOAD_BATCH -> CHECK_CO
 tag(940, 150, 1210, "clock", "snowflake", "dbt", color=ORANGE)
 box(1250, 270, 260, 560, "BRONZE", "12 raw tables\nVARIANT (JSON)\nVARCHAR (CSV)\n\n+ _source_file\n+ _file_row_number\n+ _loaded_at\n\n7 days Time Travel\n\nPII masked\n(MASK_PII_RAW)", bg="#f4e2c6", stroke=BROWN)
 tag(1250, 270, 260, "db")
-box(1550, 270, 280, 560, "SILVER  (dbt)", "12 stg_* :\n typing, cleaning,\n dedup, reject_reason\n\nQUARANTINE\n (every rejected row\n  + its reason)\n\n12 int_* :\n as-of logic, reliability,\n pass rate, flow index,\n intake, demand, prices\n\nincremental MERGE", bg="#fbd38d", stroke=BROWN)
+box(1550, 270, 280, 560, "SILVER  (dbt)", "13 stg_* :\n typing, cleaning,\n dedup, reject_reason\n\nQUARANTINE\n (every rejected row\n  + its reason)\n\n12 int_* :\n as-of logic, reliability,\n pass rate, flow index,\n intake, demand, prices\n\nincremental MERGE", bg="#fbd38d", stroke=BROWN)
 tag(1550, 270, 280, "dbt")
 box(1870, 270, 280, 560, "GOLD  (dbt)", "gold_supply_coverage\n _weekly  (decision)\ngold_coverage_actions\nfct_service_level_monthly\nfct_order_lines\ndim_variety / customer\ndim_beekeeper (masked)\ngold_apiary_signals\ngold_pipeline_health\nDECISION_LOG", bg=ORANGE, stroke=BROWN)
 tag(1870, 270, 280, "dbt")
@@ -198,13 +198,14 @@ arrow(1510, 550, 1550, 550, "", color=BROWN)
 arrow(1830, 550, 1870, 550, "", color=BROWN)
 text(1250, 840, "dbt build: 34 models · 79 tests (keys, relationships, business rules, unit test) · a failed test upstream SKIPS gold", size=13, color=BROWN)
 text(1560, 245 + 0, "", size=1)
-arrow(370, 499, 1600, 290, "", color=GREEN, dashed=True, mid=[900, 120])
-text(1660, 248, "seed: FranceAgriMer", size=12, color=GREEN)
+arrow(370, 499, 1690, 270, "", color=GREEN, dashed=True)
+EL[-1].update({"points": [[0, 0], [35, -54], [560, -54], [560, -241], [1320, -241], [1320, -229]], "height": 241, "roundness": None})
+text(1700, 250, "seed: FranceAgriMer", size=12, color=GREEN)
 box(940, 880, 600, 220, "Governance & operations",
     "• roles: ADMIN / PIPELINE / PURCHASING / ANALYST · service users key-pair only\n• masking policies on PII · tags (sensitivity, owner, domain) · ACCESS_HISTORY audit\n• resource monitor 15 credits (notify 75 %, suspend 100 %) + Budget (incl. serverless)\n• Data Metric Functions on micro-batch tables\n• serverless alerts: hive feed stale (2 h), coverage RED (07:30)\n• PIPELINE_RUN_LOG · FinOps views (cost per run, per decision)", bg="#f8f9fa", stroke=GREY)
 tag(940, 880, 600, "lock", color=GREY)
 box(1570, 880, 580, 220, "Warehouses (XS, auto-suspend 60 s)",
-    "BEEGS_PIPELINE_WH: load + dbt\nBEEGS_BI_WH: dashboard + analysts\n\n~ 4 credits/month ~ EUR 15 = EUR 3.50 per weekly decision\nGitHub Actions within the free quota (EUR 0)", bg="#f8f9fa", stroke=GREY)
+    "BEEGS_PIPELINE_WH: load + dbt\nBEEGS_BI_WH: dashboard + analysts\n\nest. ~ 4 credits/month ~ EUR 15 = EUR 3.50 per weekly decision\nGitHub Actions within the free quota (EUR 0)", bg="#f8f9fa", stroke=GREY)
 tag(1570, 880, 580, "euro", "snowflake", color=GREY)
 
 # ------------------------------------------------------------------ consumption
@@ -217,7 +218,7 @@ tag(2220, 670, 280, "user", color=GREY)
 arrow(2150, 370, 2220, 370, "", color=GREEN)
 arrow(2150, 570, 2220, 570, "", color=RED)
 arrow(2150, 720, 2220, 720, "", color=GREY)
-text(2220, 810, "Business outcome:\nB2B service level >= 95 %\n(2025: 84.6 %, EUR 294 k lost)", size=15, color=GREEN)
+text(2220, 810, "Business outcome:\nB2B service level >= 95 %\n(simulated 2025: 84.6 %, EUR 294 k lost)", size=15, color=GREEN)
 
 # ------------------------------------------------------------------ bottom band: IaC / CI
 box(30, 1150, 1260, 100, "IaC · OpenTofu (terraform/snowflake)",

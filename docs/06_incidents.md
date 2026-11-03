@@ -14,7 +14,7 @@
 | **Completeness** | today's ERP and WMS exports present in bronze (WMS ≥ 50 lots) | task `T_CHECK_COMPLETE` | graph stops, dbt not run, e-mail |
 | **Completeness** | 64 rows (8 varieties × 8 weeks) in the latest decision | `assert_horizon_is_complete` | build fails |
 | **Quality share** | > 5 % rejected rows among the last 3 days of loads of a source | `recent_reject_share` on 5 staging models (**upstream** of gold) | build fails, gold not refreshed |
-| **Freshness** | `dbt source freshness` (26 h warn / 50 h error for daily sources, 6 h / 24 h for hive scales) | `_sources.yml` | warn / error |
+| **Freshness** | `dbt source freshness` (26 h warn / 50 h error for daily sources, 6 h / 24 h for hive scales), declared but not run by the daily pipeline | `_sources.yml` | warn / error |
 | **Freshness (streaming)** | no hive event for 6 h | serverless alert `A_HIVE_FEED_STALE` (every 2 h) + DMF FRESHNESS | e-mail to the data team |
 
 ## 2. INC-001: replay of an already-loaded file (no double counting). TESTED
@@ -60,7 +60,7 @@ RESULT: build failed=True, gold refreshed=False -> PASS (bad data stopped before
 
 **Scenario.** The 4G gateway of an apiary is down, the `hive-readings` workflow is disabled or failing, or the pipe is paused.
 
-**Detection.** Serverless alert `A_HIVE_FEED_STALE` (no row for 6 h, checked every 2 h) + `dbt source freshness` error after 24 h.
+**Detection.** Serverless alert `A_HIVE_FEED_STALE` (no row for 6 h, checked every 2 h).
 
 **Impact.** Limited by design: the flow factor falls back to the other signals (missing ratio = neutral 1.0), so the decision is degraded, not wrong.
 

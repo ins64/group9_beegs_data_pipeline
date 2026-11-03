@@ -65,7 +65,7 @@ Lineage: `dbt docs generate` (model level) and Snowsight → table → *Lineage*
 - **Generic**: `unique`, `not_null`, `relationships`, `accepted_values`, plus our own `unique_combination`, `non_negative` and `recent_reject_share` (fails if > 50 % of a single file or > 5 % overall is rejected; it sits **upstream of gold**, so a broken file stops gold from being rebuilt: INC-002).
 - **Singular**: released stock in gold = Σ released lots of the WMS snapshot; horizon complete (64 rows = 8 varieties × 8 weeks); EU limits on lab results.
 - **Unit test** `coverage_formula_acceptance_test`: the coverage formula on a case computed by hand.
-- **Source freshness** on every source (warn / error thresholds per source rhythm).
+- **Source freshness** thresholds declared per source rhythm; not run by the daily pipeline.
 
 ## 6. Seeds
 
