@@ -1,0 +1,33 @@
+# --- data: generated, never committed (reproducible with the seed) ---
+data/
+*.duckdb
+*.duckdb.wal
+# --- secrets / local config ---
+.env
+*.env
+*.pem
+*.p8
+*.key
+*key*.json
+terraform.tfvars
+*.auto.tfvars
+# --- terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tf.plan
+.terraform.lock.hcl.bak
+# --- dbt ---
+dbt/beegs/target/
+dbt/beegs/dbt_packages/
+dbt/beegs/logs/
+logs/
+.user.yml
+# --- python ---
+__pycache__/
+*.pyc
+.venv/
+# --- OS ---
+.DS_Store
+Thumbs.db
