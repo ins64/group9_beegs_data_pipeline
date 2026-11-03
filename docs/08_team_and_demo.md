@@ -8,7 +8,7 @@
 |---|---|---|---|
 | **Kelsy NGUYEN** | **Business case, use case & metric, sources and extraction** (real APIs, extract container, simulator of the internal systems) | `docs/01-02`, `extract/`, `data_generator/`, `config/` | BeeG's, business model, problem, decision & metric, sources |
 | **Philomène CHOLET** | **Ingestion and orchestration** (landing stage, COPY INTO, Snowpipe, task graph), **reliability and incidents**, **live demo** | `snowflake/01-03`, `snowflake/incidents/`, `incidents/`, `docs/05-06`, `docs/11` | architecture, ingestion, tools, reliability, **LIVE DEMO** |
-| **Inès SIMOND-CHARBINAT** | **dbt transformations**: bronze → silver → gold, 117 tests + unit test, lineage, Streamlit cockpit, validation (reconciliation, backtest) | `dbt/beegs/`, `streamlit/`, `scripts/verify_against_answer_key.py`, `docs/04` | dbt layers & tests, cockpit, "is the number right?" |
+| **Inès SIMOND-CHARBINAT** | **dbt transformations**: bronze → silver → gold, 78 tests + unit test, lineage, Streamlit cockpit, validation (reconciliation, backtest) | `dbt/beegs/`, `streamlit/`, `scripts/verify_against_answer_key.py`, `docs/04` | dbt layers & tests, cockpit, "is the number right?" |
 | **Alzira FERREIRA** | **FinOps & TCO**, plus the platform around it: IaC (OpenTofu) & CI/CD, security & governance, lessons learned | `terraform/snowflake/`, `.github/workflows/`, `snowflake/00, 04-08`, `docs/07, 09, 10` | IaC & CI/CD, security & governance, FinOps & TCO, what did not work, limits |
 
 ## 2. Storyline and timing (19 min + Q&A)
@@ -22,7 +22,7 @@
 | 7 | 3:15 | Kelsy | Sources | "Each source answers one part of the formula." | doc 03 §2 |
 | 8 | 4:00 | Philomène | Architecture | Read it left → right, one arrow = one method | diagram |
 | 9-10 | 5:00 | Philomène | Ingestion methods + tools & trade-offs | requirement → method → why not the others; why no Airflow, why Snowflake only | doc 03 §3, §5 |
-| 11 | 6:30 | Inès | dbt: 3 layers, 117 tests | "Nothing is dropped silently: quarantine." | dbt DAG |
+| 11 | 6:30 | Inès | dbt: 3 layers, 79 tests | "Nothing is dropped silently: quarantine." | dbt DAG |
 | 12 | 7:45 | Inès | Cockpit | "ACACIA RED from W48, 3.5 t short → buy partner stock" | heatmap |
 | 13 | 8:45 | Inès | Is the number right? | unit test + reconciliation to the kg + backtest | evidence files |
 | 14 | 9:30 | Philomène | Reliability | idempotent steps, completeness gate, finalizer, real Open-Meteo outage | doc 06 |

@@ -16,7 +16,7 @@ Data Engineering & Cloud Infrastructure project, Albert School. Team: Kelsy NGUY
 | Ingestion | API pull with watermark · daily batch files + `COPY INTO` · Snowpipe micro-batch (labs, hive scales) · incremental MERGE · manual monthly upload · dbt seed · SQL INSERT write-back |
 | Cloud | **Snowflake on Google Cloud (europe-west2)**: internal stage = landing zone · **GitHub Actions** = serverless compute for the extraction container (GHCR) and CI/CD · **OpenTofu** IaC with encrypted state |
 | Warehouse | **Snowflake**: BRONZE → SILVER → GOLD, task graph, Data Metric Functions, serverless alerts, masking policies, tags, budgets, resource monitor, Streamlit |
-| Transformation | **dbt** (run as a *dbt Project on Snowflake*): 26 models, 117 tests incl. a unit test of the metric, quarantine, as-of logic for backtests |
+| Transformation | **dbt** (run as a *dbt Project on Snowflake*): 34 models, 79 tests incl. a unit test of the metric, quarantine, as-of logic for backtests |
 | Output | `GOLD.GOLD_SUPPLY_COVERAGE_WEEKLY`, `GOLD.GOLD_COVERAGE_ACTIONS`, Streamlit cockpit, e-mail alert when a variety turns RED |
 | Cost & governance | ≈ €15/month (prototype), ≈ €200/month at 10×; FinOps views + Snowflake Budget + resource monitor; 3-year TCO vs Fivetran/Composer; tags, classification, audit, GDPR retention (docs/07, docs/09) |
 

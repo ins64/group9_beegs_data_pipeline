@@ -32,12 +32,12 @@
 | Snowflake + extraction run | ~€200/month | ~€190/month | ~€200/month |
 | Build (one-off) | 25 days = €10 k | 15 days = €6 k | 30 days = €12 k |
 | Maintenance | 2 days/month = €800 | 1 day/month = €400 | 3 days/month = €1,200 |
-| **3-year TCO** | **≈ €46 k** | **≈ €38-40 k** | **≈ €68 k** |
+| **3-year TCO** | **≈ €46 k** | **≈ €35-37.5 k** | **≈ €75 k** |
 | Hive scales every 4 h | ✅ micro-batch → Snowpipe | ⚠️ Fivetran syncs every 5-15 min at best | ✅ (via Pub/Sub too) |
 | Lock-in | low (open code, raw files kept in the stage) | medium (connectors, MAR pricing changes) | low |
 
 **What the TCO tells us:**
-1. **People cost dominates** (≥ 75 % of every option). Optimising credits matters less than reducing maintenance days.
+1. **People cost dominates** (54-84 % of every option). Optimising credits matters less than reducing maintenance days.
 2. For the **prototype**, our stack is the right choice: €0 licence, it fits the course (dbt Core, Snowflake, IaC), and it handles our 4 niche APIs and the 4-hourly IoT files natively.
 3. **Decision rule for production:** when the internal systems become real databases (ERP/WMS on Postgres or SAP), we move the *database* sources to a managed connector (Fivetran or Snowflake Openflow CDC). They are cheap at our MAR volume and cut maintenance. We keep our container for the 4 niche APIs (no native connector exists). We do **not** take Composer before we orchestrate several non-Snowflake systems.
 4. Risk to watch with Fivetran: the price is driven by MAR. The daily WMS *full snapshot* would multiply MAR, so we would switch it to change-data-capture first.
@@ -78,12 +78,12 @@ The same ownership is **in the platform**: Snowflake tags `DATA_OWNER`, `DATA_DO
 | ERP export | one line per change, `updated_at` monotonic, known statuses | accepted values, incremental merge, reconciliation | by 05:30 daily (completeness gate) |
 | WMS snapshot | all lots in stock, every day | completeness gate (≥ 50 lots) | by 05:30 daily |
 | Hive scales | JSON with `event_id`, `ts`, `weight_kg` | dedup, sensor-fault quarantine, DMFs | a reading every 4 h; alert after 6 h |
-| GOLD tables | grain, columns and meaning documented (dbt docs → Snowflake comments) | 117 dbt tests + unit test | refreshed by 07:00 every day |
+| GOLD tables | grain, columns and meaning documented (dbt docs → Snowflake comments) | 78 dbt tests + unit test | refreshed by 07:00 every day |
 
 ### 3.4 Lineage, audit, change management, retention
 
 - **Lineage:** dbt DAG (model level) + Snowsight lineage (column level). Every bronze row knows its `_source_file`.
 - **Audit:** `ACCESS_HISTORY` shows who read the PII columns (last 30 days); `GRANTS_TO_USERS` is used for a **quarterly access review**; Snowflake query history keeps every query 1 year.
-- **Change management:** every change goes through a pull request. CI regenerates the data, runs `dbt build` (117 tests) and reconciles with the answer key, and also runs `terraform validate`. Terraform `plan` is reviewed before `apply`. SQL scripts are numbered and idempotent.
+- **Change management:** every change goes through a pull request. CI regenerates the data, runs `dbt build` (79 tests) and reconciles with the answer key, and also runs `terraform validate`. Terraform `plan` is reviewed before `apply`. SQL scripts are numbered and idempotent.
 - **Retention (GDPR):** beekeeper personal data is kept for 3 years after the last delivery, then purged (task `T_GDPR_PURGE`, yearly). Bronze has 7 days of Time Travel. Landed files older than 180 days can be removed from the stage (already in bronze). Decision logs are kept 5 years (audit of purchases).
 - **Quality as governance:** nothing is deleted silently. `SILVER.QUARANTINE` lists every rejected row with its reason, so the data owner can fix it at the source.

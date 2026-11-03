@@ -196,7 +196,7 @@ arrow(1210, 700, 1250, 700, "", color=ORANGE)
 text(1180, 715, "(10)(12)\nSnowpipe", size=12, color=ORANGE)
 arrow(1510, 550, 1550, 550, "", color=BROWN)
 arrow(1830, 550, 1870, 550, "", color=BROWN)
-text(1250, 840, "dbt build: 26 models · 117 tests (keys, relationships, business rules, freshness, unit test) · a failed test upstream SKIPS gold", size=13, color=BROWN)
+text(1250, 840, "dbt build: 34 models · 79 tests (keys, relationships, business rules, unit test) · a failed test upstream SKIPS gold", size=13, color=BROWN)
 text(1560, 245 + 0, "", size=1)
 arrow(370, 499, 1600, 290, "", color=GREEN, dashed=True, mid=[900, 120])
 text(1660, 248, "seed: FranceAgriMer", size=12, color=GREEN)
@@ -225,7 +225,7 @@ box(30, 1150, 1260, 100, "IaC · OpenTofu (terraform/snowflake)",
     bg="#e7f0fb", stroke=BLUE, size=15)
 tag(30, 1150, 1260, "opentofu", "snowflake")
 box(1320, 1150, 1200, 120, "CI/CD · GitHub Actions",
-    "ci: generate -> DuckDB -> dbt build (117 tests) -> reconcile · tofu validate · docker build\ndeploy: tofu apply -> SQL 01..08 -> snow dbt deploy -> Streamlit · build-image (GHCR) · backfill\nops: run-pipeline · health-check · incident-drill (INC-002, asserted) · demo-prepare / demo-rehearsal",
+    "ci: generate -> DuckDB -> dbt build (79 tests) -> reconcile · tofu validate · docker build\ndeploy: tofu apply -> SQL 01..08 -> snow dbt deploy -> Streamlit · build-image (GHCR) · backfill\nops: run-pipeline · health-check · incident-drill (INC-002, asserted) · demo-prepare / demo-rehearsal",
     bg="#f1f3f5", stroke=GREY, size=15)
 tag(1320, 1150, 1200, "github", "githubactions", "duckdb", "docker")
 
