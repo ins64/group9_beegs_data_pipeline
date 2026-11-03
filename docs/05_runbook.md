@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | Snowflake account (trial is fine), Enterprise edition | ours: `ZEFQCKT-WL69349`, Google Cloud europe-west2 |
-| GitHub repository with Actions enabled | `Philomenechlt/beegs_data_pipeline` |
+| GitHub repository with Actions enabled | `ins64/group9_beegs_data_pipeline` |
 | For local development only | Python 3.12 + `pip install dbt-duckdb duckdb pandas` |
 
 ## 1. Local run (free, 2 minutes, no cloud)

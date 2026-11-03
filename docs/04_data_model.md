@@ -60,7 +60,7 @@ Lineage: `dbt docs generate` (model level) and Snowsight → table → *Lineage*
 | `gold_apiary_signals` | apiary × variety | map / signals tab |
 | `gold_pipeline_health` | source | freshness tile |
 
-## 5. Tests (117 in one `dbt build`)
+## 5. Tests (79 in one `dbt build`)
 
 - **Generic**: `unique`, `not_null`, `relationships`, `accepted_values`, plus our own `unique_combination`, `non_negative` and `recent_reject_share` (fails if > 50 % of a single file or > 5 % overall is rejected; it sits **upstream of gold**, so a broken file stops gold from being rebuilt: INC-002).
 - **Singular**: released stock in gold = Σ released lots of the WMS snapshot; horizon complete (64 rows = 8 varieties × 8 weeks); EU limits on lab results.

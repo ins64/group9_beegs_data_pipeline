@@ -7,7 +7,7 @@
 | Type | Check | Where | On failure |
 |---|---|---|---|
 | **Key** | `unique` / `not_null` on every business key; `unique_combination` on composite grains (gold: as_of × variety × week) | dbt | build fails, downstream skipped |
-| **Key** | dedup on `event_id` (gateway retries, re-sent files), on `order_line_version_key`, on `(snapshot_date, lot_id)` | dbt silver | duplicates removed (1,497 hive duplicates = all injected ones) |
+| **Key** | dedup on `event_id` (gateway retries, re-sent files), on `order_line_version_key`, on `(snapshot_date, lot_id)` | dbt silver | duplicates removed (1,509 hive duplicates = all injected ones) |
 | **Business rule** | lab PASS must respect the EU limits (moisture ≤ 20 %, HMF ≤ 40) | `assert_lab_pass_respects_eu_limits` | warn → quality manager |
 | **Business rule** | released stock in GOLD = Σ RELEASED lots in WMS (to the kg) | `assert_released_stock_reconciles_with_wms` | build fails |
 | **Business rule** | the metric formula on a hand-computed case | unit test `coverage_formula_acceptance_test` | build fails |
