@@ -1,0 +1,32 @@
+version: 2
+seeds:
+  - name: variety_label_map
+    description: >
+      Mapping table (versioned in Git) from every spelling of a honey variety seen in the sources (ERP, portal, labs)
+      to our 8 variety codes. A label not in this table is QUARANTINED with reason 'unknown_variety' and must be
+      added here by a human: we never guess a variety.
+    columns:
+      - name: raw_label_upper
+        description: Upper-cased, trimmed label as typed in the source.
+        data_tests: [unique, not_null]
+      - name: variety_code
+        data_tests:
+          - relationships: {to: ref('honey_varieties'), field: variety_code}
+  - name: lab_verdict_map
+    description: Mapping of the verdict labels used by our 2 partner labs (FR/EN, OK/KO) to PASS/FAIL.
+    columns:
+      - name: raw_verdict_upper
+        data_tests: [unique, not_null]
+      - name: verdict
+        data_tests:
+          - accepted_values: {values: ['PASS', 'FAIL']}
+  - name: honey_varieties
+    description: >
+      Reference data for the 8 varieties we trade. Bulk prices are REAL: FranceAgriMer, Observatoire de la
+      production de miel et gelee royale 2024 (published July 2025). Season weeks = typical French nectar-flow
+      and delivery windows (beekeeping calendar, explicit assumption). gbif_plant = the plant queried in GBIF.
+    columns:
+      - name: variety_code
+        data_tests: [unique, not_null]
+      - name: bulk_price_eur_kg_2024
+        description: Average bulk (vrac) price paid to French beekeepers in 2024, EUR/kg, excl. VAT.

@@ -1,0 +1,154 @@
+version: 2
+
+groups:
+  - name: supply_planning
+    owner:
+      name: Kelsy NGUYEN (data) / Head of Sourcing (business)
+      email: data@beegs.example
+
+models:
+  - name: gold_supply_coverage_weekly
+    description: >
+      DECISION TABLE (use case UC1). For each decision date, variety and week of the next 8 weeks: cumulative
+      lab-approved supply vs cumulative B2B demand, coverage ratio, RED/AMBER/GREEN status and shortfall in kg.
+      Consumed every Monday 08:00 by the Head of Sourcing (dashboard) and by the Snowflake alert A_COVERAGE_RED.
+    data_tests:
+      - unique_combination:
+          columns: [as_of_date, variety_code, week_number]
+    columns:
+      - name: as_of_date
+        description: Decision date (= warehouse snapshot date used). Rerunning a date replaces its rows (merge).
+        data_tests: [not_null]
+      - name: variety_code
+        data_tests:
+          - not_null
+          - relationships: {to: ref('honey_varieties'), field: variety_code}
+      - name: week_number
+        description: 1 = the ISO week after the decision date ... 8.
+        data_tests:
+          - not_null
+          - accepted_values: {values: [1, 2, 3, 4, 5, 6, 7, 8], quote: false}
+      - name: coverage_ratio
+        description: cumulative_supply_kg / cumulative_demand_kg. NULL when there is no demand at all.
+        data_tests:
+          - non_negative
+      - name: coverage_status
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['RED', 'AMBER', 'GREEN']}
+      - name: shortfall_kg
+        description: kg missing at that week (0 if covered). Never negative.
+        data_tests: [non_negative]
+      - name: released_kg
+        description: Released (lab-passed) stock on the decision date, from the WMS snapshot.
+        data_tests: [non_negative]
+
+  - name: gold_coverage_actions
+    description: One row per variety for the latest decision date with the recommended action and the cost of each sourcing option.
+    columns:
+      - name: variety_code
+        data_tests: [unique, not_null]
+      - name: overall_status
+        data_tests:
+          - accepted_values: {values: ['RED', 'AMBER', 'GREEN']}
+      - name: recommended_action
+        data_tests: [not_null]
+
+  - name: fct_service_level_monthly
+    description: >
+      Historical evidence of the business problem: share of B2B kg shipped on the requested date, per month and
+      variety, and the revenue lost on unserved kg. Used in the business-case slides and to measure the impact of the pipeline.
+    data_tests:
+      - unique_combination:
+          columns: [delivery_month, variety_code]
+    columns:
+      - name: service_level
+        data_tests: [non_negative]
+
+  - name: fct_order_lines
+    description: Current state of every valid order line (latest version), with its amount in EUR.
+    columns:
+      - name: order_line_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - relationships: {to: ref('dim_customer'), field: customer_id}
+      - name: variety_code
+        data_tests:
+          - relationships: {to: ref('dim_variety'), field: variety_code}
+
+  - name: dim_beekeeper
+    description: Partner beekeepers. email and phone are personal data, masked by policy MASK_PII except for BEEGS_PURCHASING / BEEGS_ADMIN.
+    meta: {sensitivity: pii, data_owner: Head of Sourcing, retention: "3 years after last delivery (GDPR)"}
+    columns:
+      - name: beekeeper_id
+        data_tests: [unique, not_null]
+      - name: email
+        description: PERSONAL DATA - masked.
+        meta: {sensitivity: pii, gdpr_basis: "contract (supplier relationship)"}
+      - name: phone
+        description: PERSONAL DATA - masked.
+        meta: {sensitivity: pii, gdpr_basis: "contract (supplier relationship)"}
+      - name: reliability_365d
+        description: delivered kg / declared kg over the last 365 days.
+
+  - name: dim_customer
+    description: B2B customers from the ERP + the webshop as technical customer C0000.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+
+  - name: dim_variety
+    description: The 8 varieties, their seasons, FranceAgriMer 2024 bulk price and today's partner / spot price references.
+    columns:
+      - name: variety_code
+        data_tests: [unique, not_null]
+
+  - name: gold_apiary_signals
+    description: Per apiary and variety, the observed nectar-flow factor this season and the number of foraging days forecast for the next 8 days.
+
+  - name: gold_pipeline_health
+    description: Per source, rows in bronze, last load time and quarantine share. Feeds the dashboard freshness tile.
+    columns:
+      - name: source_name
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: coverage_formula_acceptance_test
+    description: >
+      ACCEPTANCE TEST of the metric, on hand-computed known data (docs/02_use_case_and_metric.md, section 5).
+      ACACIA: 3,000 kg released + 1,000 kg pending lab at 90 % pass -> 3,900 kg at start.
+      Week 1: no intake, demand 2,000 + 100 B2C  -> 3,900 / 2,100 = 1.857 GREEN, shortfall 0.
+      Week 2: intake 500, demand 2,000 + 100     -> 4,400 / 4,200 = 1.048 AMBER, shortfall 0.
+      Week 3: no intake, demand 1,900 + 100      -> 4,400 / 6,200 = 0.710 RED,   shortfall 1,800.
+    model: gold_supply_coverage_weekly
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('int_horizon_weeks')
+        rows:
+          - {as_of_date: '2026-11-01', week_number: 1, week_start: '2026-11-02'}
+          - {as_of_date: '2026-11-01', week_number: 2, week_start: '2026-11-09'}
+          - {as_of_date: '2026-11-01', week_number: 3, week_start: '2026-11-16'}
+      - input: ref('honey_varieties')
+        rows:
+          - {variety_code: ACACIA}
+      - input: ref('int_supply_position')
+        rows:
+          - {variety_code: ACACIA, stock_snapshot_date: '2026-11-01', released_kg: 3000, pending_lab_kg: 1000, pass_rate: 0.9}
+      - input: ref('int_expected_intake_weekly')
+        rows:
+          - {variety_code: ACACIA, week_number: 1, declared_kg: 0,   expected_intake_kg: 0}
+          - {variety_code: ACACIA, week_number: 2, declared_kg: 600, expected_intake_kg: 500}
+          - {variety_code: ACACIA, week_number: 3, declared_kg: 0,   expected_intake_kg: 0}
+      - input: ref('int_demand_weekly')
+        rows:
+          - {variety_code: ACACIA, week_number: 1, confirmed_b2b_kg: 2000, baseline_b2b_kg: 1500, b2b_demand_kg: 2000, b2c_reserve_kg: 100}
+          - {variety_code: ACACIA, week_number: 2, confirmed_b2b_kg: 800,  baseline_b2b_kg: 2000, b2b_demand_kg: 2000, b2c_reserve_kg: 100}
+          - {variety_code: ACACIA, week_number: 3, confirmed_b2b_kg: 1900, baseline_b2b_kg: 1500, b2b_demand_kg: 1900, b2c_reserve_kg: 100}
+    expect:
+      rows:
+        - {variety_code: ACACIA, week_number: 1, cumulative_supply_kg: 3900, cumulative_demand_kg: 2100, coverage_ratio: 1.857, coverage_status: GREEN, shortfall_kg: 0}
+        - {variety_code: ACACIA, week_number: 2, cumulative_supply_kg: 4400, cumulative_demand_kg: 4200, coverage_ratio: 1.048, coverage_status: AMBER, shortfall_kg: 0}
+        - {variety_code: ACACIA, week_number: 3, cumulative_supply_kg: 4400, cumulative_demand_kg: 6200, coverage_ratio: 0.710, coverage_status: RED,   shortfall_kg: 1800}

@@ -1,0 +1,56 @@
+# BeeGs dbt project - medallion: BRONZE (raw, loaded by Snowflake) -> SILVER (staging + intermediate) -> GOLD (marts)
+# Runs in two places with the SAME code:
+#   * prod  : dbt Projects on Snowflake, executed by the task graph (snowflake/04_tasks.sql)
+#   * local : DuckDB on a laptop (free) - see README "Local development"
+name: beegs
+version: "1.0.0"
+config-version: 2
+profile: beegs
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Decision date. NULL = latest warehouse snapshot available. Set it to replay / backtest a past day:
+  #   dbt build --vars '{as_of_date: "2026-05-25"}'   (gold history is merged on as_of_date: no double count)
+  as_of_date: null
+  horizon_weeks: 8                 # decision horizon agreed with the Head of Sourcing
+  red_threshold: 0.90              # coverage < 0.90 -> RED (act now)
+  green_threshold: 1.10            # coverage >= 1.10 -> GREEN; in between AMBER (watch)
+  baseline_weeks: 13               # demand baseline = average B2B weekly orders over the last 13 weeks
+  default_lab_pass_rate: 0.90      # used when a variety has < 20 lab results in the last 365 days
+  default_reliability: 0.90        # used for a beekeeper with no delivery history yet
+  landed_cost_factor: 1.12         # spot import: transport + customs + extra lab test (+12 %)
+  partner_premium_factor: 1.05     # unplanned purchase from partner stock (+5 % vs declared price)
+  max_quarantine_share: 0.05       # business-rule test: > 5 % rejected rows = the source is broken
+
+models:
+  beegs:
+    +persist_docs: {relation: true, columns: true}   # descriptions visible in Snowsight
+    +query_tag: beegs_dbt                             # FinOps: every dbt query is attributable (snowflake/08_finops.sql)
+    staging:
+      +schema: silver
+      +materialized: view
+    intermediate:
+      +schema: silver
+      +materialized: table
+    marts:
+      +schema: gold
+      +materialized: table
+      +group: supply_planning                        # governance: owned by one team, one accountable person
+      +access: public                                # only GOLD may be used outside the project
+      # consumers may read GOLD, and only GOLD (BRONZE/SILVER have no grant at all for them)
+      +post-hook:
+        - "{% if target.type == 'snowflake' %}grant select on {{ this }} to role BEEGS_PURCHASING{% endif %}"
+        - "{% if target.type == 'snowflake' %}grant select on {{ this }} to role BEEGS_ANALYST{% endif %}"
+
+seeds:
+  beegs:
+    +schema: silver
+
+flags:
+  send_anonymous_usage_stats: false

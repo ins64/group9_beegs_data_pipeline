@@ -1,0 +1,9 @@
+variety_code,variety_label,bulk_price_eur_kg_2024,flow_start_week,flow_end_week,delivery_start_week,delivery_end_week,gbif_plant,price_source
+TOUTES_FLEURS,Toutes fleurs (multifloral),4.6,15,28,24,36,Taraxacum officinale,FranceAgriMer Observatoire Miel 2024 (bulk price)
+ACACIA,Acacia,7.4,19,22,22,27,Robinia pseudoacacia,FranceAgriMer Observatoire Miel 2024 (bulk price)
+CHATAIGNIER,Chataignier (chestnut),7.1,25,29,29,34,Castanea sativa,FranceAgriMer Observatoire Miel 2024 (bulk price)
+LAVANDE,Lavande (lavender),8.5,27,31,31,36,Lavandula angustifolia,FranceAgriMer Observatoire Miel 2024 (bulk price)
+TOURNESOL,Tournesol (sunflower),4.0,28,33,33,39,Helianthus annuus,FranceAgriMer Observatoire Miel 2024 (bulk price)
+COLZA,Colza (rapeseed),4.1,15,18,18,22,Brassica napus,FranceAgriMer Observatoire Miel 2024 (bulk price)
+MONTAGNE,Montagne (mountain),7.7,25,32,32,38,Rhododendron ferrugineum,FranceAgriMer Observatoire Miel 2024 (bulk price)
+TILLEUL,Tilleul (linden),6.6,24,27,27,31,Tilia cordata,FranceAgriMer Observatoire Miel 2024 (bulk price)
