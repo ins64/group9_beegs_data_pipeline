@@ -1,0 +1,95 @@
+# Continuous deployment of the Snowflake platform: infrastructure (OpenTofu) -> SQL objects -> dbt project.
+name: deploy
+on:
+  push:
+    branches: [main]
+    paths: ["terraform/**", "snowflake/0*.sql", "dbt/**", "streamlit/**", ".github/workflows/deploy.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency: deploy-snowflake      # = the state LOCK: two deployments can never overlap
+env:
+  SF_ACCOUNT: ZEFQCKT-WL69349
+  KEY_FILE: /tmp/snowflake_deploy.p8
+  ALERT_EMAIL: pcholet@albertschool.com      # must be a verified e-mail of a Snowflake user
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: opentofu/setup-opentofu@v1
+        with: {tofu_version: "1.8.8", tofu_wrapper: false}
+      - name: Install Snowflake CLI, write the deploy key (runner is ephemeral, file mode 600)
+        env:
+          KEY: ${{ secrets.SNOWFLAKE_DEPLOY_PRIVATE_KEY }}
+        run: |
+          pip install -q snowflake-cli==3.31.0
+          pip install -q cryptography==43.0.3
+          KEY="$KEY" python scripts/ci/write_key.py $KEY_FILE
+          echo "SNOW_CONN=-x --account $SF_ACCOUNT --user BEEGS_DEPLOY_SVC --authenticator SNOWFLAKE_JWT --private-key-file $KEY_FILE" >> $GITHUB_ENV
+
+      # ---------------- 1. Infrastructure as code (OpenTofu) ----------------
+      - name: Download the encrypted state from @BEEGS_INFRA.TFSTATE.STATE
+        working-directory: terraform/snowflake
+        run: snow stage copy @BEEGS_INFRA.TFSTATE.STATE/terraform.tfstate . $SNOW_CONN --role BEEGS_ADMIN || echo "no state yet (first run)"
+      - name: tofu init / validate / plan
+        working-directory: terraform/snowflake
+        env:
+          TF_VAR_state_passphrase: ${{ secrets.TF_STATE_PASSPHRASE }}
+          TF_VAR_private_key_path: /tmp/snowflake_deploy.p8
+        run: |
+          tofu init -input=false
+          tofu validate
+          tofu plan -input=false -out=tfplan
+      - name: tofu apply (main branch only, after the plan above was printed in the log)
+        if: github.ref == 'refs/heads/main'
+        working-directory: terraform/snowflake
+        env:
+          TF_VAR_state_passphrase: ${{ secrets.TF_STATE_PASSPHRASE }}
+          TF_VAR_private_key_path: /tmp/snowflake_deploy.p8
+        run: tofu apply -input=false tfplan
+      - name: Upload the (encrypted) state back - even if apply failed half-way
+        if: always() && github.ref == 'refs/heads/main'
+        working-directory: terraform/snowflake
+        run: |
+          [ -f terraform.tfstate ] || exit 0
+          grep -q '"encryption_version"\|"encrypted_data"' terraform.tfstate || { echo "::error::state is not encrypted"; exit 1; }
+          snow stage copy terraform.tfstate @BEEGS_INFRA.TFSTATE.STATE/ --overwrite $SNOW_CONN --role BEEGS_ADMIN
+
+      # ---------------- 2. SQL objects (idempotent, numbered) ----------------
+      - name: SQL 01 stages, 02 bronze + pipes + load procedure, 05 security, 07 governance, 08 FinOps
+        run: |
+          for f in 01_stages_and_file_formats 02_bronze_tables_and_loading 05_security 07_governance 08_finops; do
+            echo "::group::$f"
+            sed -e "s/<<DATA_TEAM_EMAIL>>/$ALERT_EMAIL/g" -e "s/<<HEAD_OF_SOURCING_EMAIL>>/$ALERT_EMAIL/g" snowflake/$f.sql > /tmp/$f.sql
+            snow sql -f /tmp/$f.sql --enable-templating NONE $SNOW_CONN --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH
+            echo "::endgroup::"
+          done
+
+      # ---------------- 3. dbt project (a new version of BEEGS.OPS.BEEGS_DBT) ----------------
+      - name: snow dbt deploy
+        run: snow dbt deploy BEEGS_DBT --source dbt/beegs --default-target prod $SNOW_CONN --role BEEGS_PIPELINE --warehouse BEEGS_PIPELINE_WH --database BEEGS --schema OPS
+
+      # ---------------- 4. Orchestration + monitoring ----------------
+      - name: SQL 03 task graph (+ 04 alerts once GOLD exists)
+        run: |
+          sed -e "s/<<DATA_TEAM_EMAIL>>/$ALERT_EMAIL/g" snowflake/03_dbt_project_and_tasks.sql > /tmp/03.sql
+          snow sql -f /tmp/03.sql --enable-templating NONE $SNOW_CONN --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH
+          if snow sql -q "SELECT 1 FROM BEEGS.GOLD.GOLD_COVERAGE_ACTIONS LIMIT 1" $SNOW_CONN --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH >/dev/null 2>&1; then
+            sed -e "s/<<DATA_TEAM_EMAIL>>/$ALERT_EMAIL/g" -e "s/<<HEAD_OF_SOURCING_EMAIL>>/$ALERT_EMAIL/g" snowflake/04_quality_and_alerts.sql > /tmp/04.sql
+            snow sql -f /tmp/04.sql --enable-templating NONE $SNOW_CONN --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH
+          else
+            echo "GOLD not built yet: 04 alerts will be deployed by the backfill workflow"
+          fi
+
+      # ---------------- 5. Consumption: the Streamlit cockpit (Streamlit in Snowflake) ----------------
+      - name: Streamlit app BEEGS.GOLD.COVERAGE_COCKPIT
+        run: |
+          R="$SNOW_CONN --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH"
+          snow sql --enable-templating NONE $R -q "CREATE STAGE IF NOT EXISTS BEEGS.OPS.STREAMLIT_SRC ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE') COMMENT = 'Source code of the Streamlit cockpit (deployed by CI)'"
+          snow stage copy streamlit/coverage_app.py @BEEGS.OPS.STREAMLIT_SRC/coverage/ --overwrite $R
+          snow sql --enable-templating NONE $R -q "CREATE OR REPLACE STREAMLIT BEEGS.GOLD.COVERAGE_COCKPIT FROM '@BEEGS.OPS.STREAMLIT_SRC/coverage' MAIN_FILE = 'coverage_app.py' QUERY_WAREHOUSE = BEEGS_BI_WH TITLE = 'BeeGs - Supply coverage' COMMENT = 'Monday cockpit of the Head of Sourcing (reads GOLD, writes DECISION_LOG)'"
+          snow sql --enable-templating NONE $R -q "GRANT USAGE ON STREAMLIT BEEGS.GOLD.COVERAGE_COCKPIT TO ROLE BEEGS_PURCHASING"

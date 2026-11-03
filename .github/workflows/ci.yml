@@ -1,0 +1,42 @@
+# CI on every pull request: the pipeline must build end-to-end (on DuckDB, free) before it can be merged.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  dbt-local-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install dbt-core==1.12.6 dbt-duckdb==1.11.1 duckdb==2.0.0 pandas==3.0.5
+      - name: Seeds must stay identical to the extract job's apiary list
+        run: diff config/apiaries.csv dbt/beegs/seeds/apiaries.csv
+      - name: Generate sources (seed 42) and load bronze
+        run: |
+          python data_generator/generate.py --out data/landing --end 2026-11-01
+          python data_generator/local_fixtures.py --out data/landing
+          python scripts/local_load_duckdb.py
+      - name: dbt build (models + 117 tests + unit test)
+        working-directory: dbt/beegs
+        run: dbt build --profiles-dir ../profiles_local
+      - name: Reconcile gold with the simulation truth
+        run: python scripts/verify_against_answer_key.py | tee verification.txt && grep -q "ALL RECONCILIATIONS PASS" verification.txt
+  tofu-validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with: {tofu_version: "1.8.8", tofu_wrapper: false}
+      - working-directory: terraform/snowflake
+        env:
+          TF_VAR_state_passphrase: ci-validate-only-passphrase
+        run: tofu fmt -check && tofu init -backend=false -input=false && tofu validate
+  docker-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f extract/Dockerfile -t beegs-extract:ci .
+      - run: docker run --rm -e BEEGS_LOCAL_ROOT=/tmp/data beegs-extract:ci --task internal --target local --date 2026-11-02

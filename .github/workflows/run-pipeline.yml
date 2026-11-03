@@ -1,0 +1,38 @@
+# Run the Snowflake task graph now (same as the 06:30 schedule) and wait for the result.
+# Use it after a late extraction: the run date is "yesterday" relative to now, as for the scheduled run.
+name: run-pipeline
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency: deploy-snowflake
+env:
+  SF_ACCOUNT: ZEFQCKT-WL69349
+  KEY_FILE: /tmp/snowflake_deploy.p8
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Snowflake CLI + key
+        env:
+          KEY: ${{ secrets.SNOWFLAKE_DEPLOY_PRIVATE_KEY }}
+        run: |
+          pip install -q snowflake-cli==3.31.0
+          pip install -q cryptography==43.0.3
+          KEY="$KEY" python scripts/ci/write_key.py $KEY_FILE
+          echo "C=--enable-templating NONE -x --account $SF_ACCOUNT --user BEEGS_DEPLOY_SVC --authenticator SNOWFLAKE_JWT --private-key-file $KEY_FILE --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH" >> $GITHUB_ENV
+      - name: EXECUTE TASK T_ROOT and wait for the finalizer
+        run: |
+          N() { snow sql $C --format JSON -q "SELECT COUNT(*) N FROM BEEGS.OPS.PIPELINE_RUN_LOG" | python -c "import json,sys;print(json.load(sys.stdin)[0]['N'])"; }
+          before=$(N)
+          snow sql $C -q "EXECUTE TASK BEEGS.OPS.T_ROOT"
+          for i in $(seq 1 60); do sleep 20; [ "$(N)" -gt "$before" ] && break; done
+          sleep 30   # the finalizer of a failed graph also logs after each retry
+          snow sql $C -q "SELECT run_date, finished_at, status, LEFT(failed_tasks, 200) failed FROM BEEGS.OPS.PIPELINE_RUN_LOG ORDER BY finished_at DESC LIMIT 1"
+          snow sql $C -q "SELECT MAX(computed_at) gold_computed_at FROM BEEGS.GOLD.GOLD_SUPPLY_COVERAGE_WEEKLY"
+          s=$(snow sql $C --format JSON -q "SELECT status FROM BEEGS.OPS.PIPELINE_RUN_LOG ORDER BY finished_at DESC LIMIT 1" | python -c "import json,sys;print(json.load(sys.stdin)[0]['STATUS'])")
+          [ "$s" = "SUCCESS" ] || { echo "::error::pipeline run $s"; exit 1; }

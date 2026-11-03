@@ -1,0 +1,68 @@
+# One-off initial load: history -> stage -> bronze -> first dbt build -> backtest of Monday 2026-03-30 -> alerts.
+name: backfill
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "First business date of the simulated history"
+        default: "2024-01-01"
+      start_at:
+        description: "Where to start: landing (full run) or backtest (history already landed and loaded)"
+        type: choice
+        options: [landing, backtest]
+        default: landing
+permissions:
+  contents: read
+  packages: read
+concurrency: deploy-snowflake
+env:
+  SF_ACCOUNT: ZEFQCKT-WL69349
+  KEY_FILE: /tmp/snowflake_deploy.p8
+  ALERT_EMAIL: pcholet@albertschool.com
+jobs:
+  backfill:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Land the history in @BEEGS.OPS.LANDING (container, pipeline key)
+        if: inputs.start_at == 'landing'
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PIPELINE_PRIVATE_KEY }}
+        run: |
+          IMAGE=ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/beegs-extract:stable
+          docker run --rm -e SNOWFLAKE_PRIVATE_KEY -e BEEGS_BACKFILL_FROM=${{ inputs.from }} $IMAGE --task backfill
+      - name: Snowflake CLI + deploy key
+        env:
+          KEY: ${{ secrets.SNOWFLAKE_DEPLOY_PRIVATE_KEY }}
+        run: |
+          pip install -q snowflake-cli==3.31.0
+          pip install -q cryptography==43.0.3
+          KEY="$KEY" python scripts/ci/write_key.py $KEY_FILE
+          echo "SNOW=snow sql --enable-templating NONE -x --account $SF_ACCOUNT --user BEEGS_DEPLOY_SVC --authenticator SNOWFLAKE_JWT --private-key-file $KEY_FILE --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH" >> $GITHUB_ENV
+      - name: Bronze - load every landed file once
+        if: inputs.start_at == 'landing'
+        run: $SNOW -q "CALL BEEGS.OPS.SP_LOAD_BATCH(NULL)"
+      - name: dbt build (seeds, 26 models, 117 tests)
+        if: inputs.start_at == 'landing'
+        run: $SNOW -q "EXECUTE DBT PROJECT BEEGS.OPS.BEEGS_DBT ARGS = 'build --target prod'"
+      - name: Backtest - replay the decision of Monday 2026-03-30 (merged on as_of_date, no double count)
+        run: |
+          # dbt splits ARGS like a shell: the vars must be ONE quoted token, hence the $$...$$ SQL string
+          $SNOW -q "EXECUTE DBT PROJECT BEEGS.OPS.BEEGS_DBT ARGS = \$\$run --target prod --select +gold_supply_coverage_weekly --exclude stg_wms__stock_snapshots stg_iot__hive_events stg_erp__order_lines --vars '{as_of_date: 2026-03-30}'\$\$"
+          $SNOW -q "EXECUTE DBT PROJECT BEEGS.OPS.BEEGS_DBT ARGS = 'build --target prod'"
+      - name: Alerts and data metric functions (need GOLD)
+        run: |
+          sed -e "s/<<DATA_TEAM_EMAIL>>/$ALERT_EMAIL/g" -e "s/<<HEAD_OF_SOURCING_EMAIL>>/$ALERT_EMAIL/g" snowflake/04_quality_and_alerts.sql > /tmp/04.sql
+          $SNOW -f /tmp/04.sql
+      - name: Evidence
+        run: |
+          $SNOW -q "SELECT variety_code, overall_status, first_red_iso_week, max_shortfall_kg, recommended_action FROM BEEGS.GOLD.GOLD_COVERAGE_ACTIONS ORDER BY min_coverage_ratio"
+          $SNOW -q "SELECT as_of_date, COUNT(*) FROM BEEGS.GOLD.GOLD_SUPPLY_COVERAGE_WEEKLY GROUP BY 1 ORDER BY 1"

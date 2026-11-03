@@ -1,0 +1,27 @@
+# Build the extract container once per change, push it with a VERSION tag (and the moving tag "stable").
+name: build-image
+on:
+  push:
+    branches: [main]
+    paths: ["extract/**", "data_generator/**", "config/**", ".github/workflows/build-image.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push ghcr.io/<owner>/beegs-extract:1.0.<run> and :stable
+        run: |
+          IMAGE=ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/beegs-extract
+          docker build -f extract/Dockerfile -t $IMAGE:1.0.${{ github.run_number }} -t $IMAGE:stable .
+          docker run --rm -e BEEGS_LOCAL_ROOT=/tmp/data $IMAGE:stable --task internal --target local --date 2026-11-02   # smoke test before pushing
+          docker push $IMAGE:1.0.${{ github.run_number }}
+          docker push $IMAGE:stable

@@ -1,0 +1,40 @@
+# Full rehearsal of the live demo on the real account, with the presenter's role and the same pauses:
+# parks the files under a rehearsal tag, then runs snowflake/demo/live_demo.sql (tag substituted) end to end,
+# including the recovery block, so the pipeline is green again afterwards.
+name: demo-rehearsal
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Rehearsal tag (must be new each time, e.g. rehearsal1, rehearsal2 ...)"
+        default: "rehearsal1"
+permissions:
+  contents: read
+concurrency: deploy-snowflake
+env:
+  SF_ACCOUNT: ZEFQCKT-WL69349
+  KEY_FILE: /tmp/snowflake_deploy.p8
+jobs:
+  rehearse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Snowflake CLI + key
+        env:
+          KEY: ${{ secrets.SNOWFLAKE_DEPLOY_PRIVATE_KEY }}
+        run: |
+          pip install -q snowflake-cli==3.31.0
+          pip install -q cryptography==43.0.3
+          KEY="$KEY" python scripts/ci/write_key.py $KEY_FILE
+          echo "CONN=-x --account $SF_ACCOUNT --user BEEGS_DEPLOY_SVC --authenticator SNOWFLAKE_JWT --private-key-file $KEY_FILE --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH" >> $GITHUB_ENV
+      - name: Park the rehearsal files
+        run: |
+          cp incidents/lab_results_lab_apinov_BROKEN.csv /tmp/lab_results_lab_apinov_BROKEN_${{ inputs.tag }}.csv
+          cp incidents/lab_results_lab_apinov_FIXED.csv  /tmp/lab_results_lab_apinov_FIXED_${{ inputs.tag }}.csv
+          snow stage copy /tmp/lab_results_lab_apinov_BROKEN_${{ inputs.tag }}.csv @BEEGS.OPS.LANDING/demo_parking/ --overwrite $CONN
+          snow stage copy /tmp/lab_results_lab_apinov_FIXED_${{ inputs.tag }}.csv  @BEEGS.OPS.LANDING/demo_parking/ --overwrite $CONN
+      - name: Run the live demo script
+        run: python scripts/ci/rehearse_demo.py ${{ inputs.tag }}

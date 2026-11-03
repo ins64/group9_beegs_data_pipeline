@@ -1,0 +1,94 @@
+# INC-002 drill, fully automated on the real Snowflake account (the same scenario is shown live in the demo):
+#   a lab sends a file with renamed columns -> Snowpipe loads it -> the task graph runs -> the reject-share test fails,
+#   GOLD is NOT refreshed, the finalizer logs FAILED -> the lab re-sends the fixed file -> next run is green.
+name: incident-drill
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Suffix for the file names (Snowpipe never loads the same file name twice)"
+        default: "drill1"
+permissions:
+  contents: read
+concurrency: deploy-snowflake
+env:
+  SF_ACCOUNT: ZEFQCKT-WL69349
+  KEY_FILE: /tmp/snowflake_deploy.p8
+  FOLDER: lab_results/dt=2026-10-31
+jobs:
+  drill:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Snowflake CLI + key
+        env:
+          KEY: ${{ secrets.SNOWFLAKE_DEPLOY_PRIVATE_KEY }}
+        run: |
+          pip install -q snowflake-cli==3.31.0
+          pip install -q cryptography==43.0.3
+          KEY="$KEY" python scripts/ci/write_key.py $KEY_FILE
+          CONN="-x --account $SF_ACCOUNT --user BEEGS_DEPLOY_SVC --authenticator SNOWFLAKE_JWT --private-key-file $KEY_FILE --role BEEGS_ADMIN --warehouse BEEGS_PIPELINE_WH"
+          echo "CONN=$CONN" >> $GITHUB_ENV
+          echo "C=--enable-templating NONE $CONN" >> $GITHUB_ENV
+          cat > /tmp/run_graph.sh <<'EOF'
+          # run the task graph now and wait for the finalizer; print the run log line
+          set -e
+          before=$(snow sql $C --format JSON -q "SELECT COUNT(*) N FROM BEEGS.OPS.PIPELINE_RUN_LOG" | python -c "import json,sys;print(json.load(sys.stdin)[0]['N'])")
+          snow sql $C -q "EXECUTE TASK BEEGS.OPS.T_ROOT"
+          for i in $(seq 1 60); do
+            sleep 20
+            n=$(snow sql $C --format JSON -q "SELECT COUNT(*) N FROM BEEGS.OPS.PIPELINE_RUN_LOG" | python -c "import json,sys;print(json.load(sys.stdin)[0]['N'])")
+            [ "$n" -gt "$before" ] && break
+          done
+          snow sql $C -q "SELECT run_date, finished_at, status, LEFT(failed_tasks, 150) failed FROM BEEGS.OPS.PIPELINE_RUN_LOG ORDER BY finished_at DESC LIMIT 1"
+          snow sql $C -q "SELECT name, state, DATEDIFF(second, query_start_time, completed_time) secs, LEFT(error_message, 120) err FROM TABLE(BEEGS.INFORMATION_SCHEMA.TASK_HISTORY(SCHEDULED_TIME_RANGE_START => DATEADD(minute, -30, CURRENT_TIMESTAMP()))) ORDER BY scheduled_time DESC LIMIT 6"
+          snow sql $C --format JSON -q "SELECT status, COALESCE(failed_tasks, '') failed FROM BEEGS.OPS.PIPELINE_RUN_LOG ORDER BY finished_at DESC LIMIT 1" > /tmp/last_run.json
+          GOLD=$(snow sql $C --format JSON -q "SELECT TO_VARCHAR(MAX(computed_at)) G FROM BEEGS.GOLD.GOLD_SUPPLY_COVERAGE_WEEKLY" | python -c "import json,sys;print(json.load(sys.stdin)[0]['G'])")
+          echo "GOLD_NOW=$GOLD" >> $GITHUB_ENV
+          echo "gold computed_at: $GOLD"
+          EOF
+      - name: 0. Before - gold timestamp
+        run: |
+          G=$(snow sql $C --format JSON -q "SELECT TO_VARCHAR(MAX(computed_at)) G FROM BEEGS.GOLD.GOLD_SUPPLY_COVERAGE_WEEKLY" | python -c "import json,sys;print(json.load(sys.stdin)[0]['G'])")
+          echo "gold computed_at before: $G"; echo "GOLD_BEFORE=$G" >> $GITHUB_ENV
+      - name: 1. The lab sends a file with renamed columns (moisture, result) -> Snowpipe
+        run: |
+          # same mechanics as the live demo (snowflake/demo/live_demo.sql): park the file, then COPY FILES it in
+          cp incidents/lab_results_lab_apinov_BROKEN.csv /tmp/lab_results_lab_apinov_BROKEN_${{ inputs.tag }}.csv
+          snow stage copy $CONN /tmp/lab_results_lab_apinov_BROKEN_${{ inputs.tag }}.csv @BEEGS.OPS.LANDING/demo_parking/ --overwrite
+          snow sql $C -q "COPY FILES INTO @BEEGS.OPS.LANDING/$FOLDER/ FROM @BEEGS.OPS.LANDING/demo_parking/ PATTERN = '.*BROKEN_${{ inputs.tag }}[.]csv'"
+          snow sql $C -q "ALTER PIPE BEEGS.OPS.PIPE_LAB_RESULTS REFRESH PREFIX = 'dt=2026-10-31/'"
+          sleep 60
+          snow sql $C -q "SELECT _source_file, COUNT(*) n_rows, COUNT(verdict) with_verdict, COUNT(moisture_pct) with_moisture FROM BEEGS.BRONZE.LAB_RESULTS_RAW WHERE _source_file ILIKE '%${{ inputs.tag }}%' GROUP BY 1"
+      - name: 2. The daily graph runs -> test fails, GOLD is protected
+        run: |
+          bash /tmp/run_graph.sh
+          # ASSERT: the run failed in dbt (the test), and GOLD was not rewritten
+          python - <<'PY'
+          import json, os
+          r = json.load(open('/tmp/last_run.json'))[0]
+          print(r)
+          assert r['STATUS'] == 'FAILED' and 'T_DBT_BUILD' in r['FAILED'], 'expected a FAILED run caused by T_DBT_BUILD'
+          PY
+          [ "$(grep GOLD_NOW $GITHUB_ENV | tail -1 | cut -d= -f2-)" = "$GOLD_BEFORE" ] || { echo "::error::GOLD was rewritten by a broken run"; exit 1; }
+          echo "OK: run FAILED in dbt, GOLD untouched ($GOLD_BEFORE)"
+      - name: 3. Recovery - the lab re-sends the agreed format -> next run is green
+        run: |
+          cp incidents/lab_results_lab_apinov_FIXED.csv /tmp/lab_results_lab_apinov_FIXED_${{ inputs.tag }}.csv
+          snow stage copy $CONN /tmp/lab_results_lab_apinov_FIXED_${{ inputs.tag }}.csv @BEEGS.OPS.LANDING/demo_parking/ --overwrite
+          snow sql $C -q "COPY FILES INTO @BEEGS.OPS.LANDING/$FOLDER/ FROM @BEEGS.OPS.LANDING/demo_parking/ PATTERN = '.*FIXED_${{ inputs.tag }}[.]csv'"
+          snow sql $C -q "ALTER PIPE BEEGS.OPS.PIPE_LAB_RESULTS REFRESH PREFIX = 'dt=2026-10-31/'"
+          sleep 60
+          bash /tmp/run_graph.sh
+          # ASSERT: the run is green and GOLD was refreshed
+          python - <<'PY'
+          import json
+          r = json.load(open('/tmp/last_run.json'))[0]
+          print(r)
+          assert r['STATUS'] == 'SUCCESS', 'expected a SUCCESS run after the fixed file'
+          PY
+          [ "$(grep GOLD_NOW $GITHUB_ENV | tail -1 | cut -d= -f2-)" != "$GOLD_BEFORE" ] || { echo "::error::GOLD not refreshed"; exit 1; }
+          echo "OK: run SUCCESS, GOLD refreshed"
