@@ -39,7 +39,7 @@
 
 | Question | Answer |
 |---|---|
-| Why not Airflow? | 4 SQL steps inside Snowflake → task graph = no server, retries, finalizer, history. Airflow/Composer (~€300/month) when we orchestrate many external systems. |
+| Why not Airflow? | 4 SQL steps inside Snowflake → task graph = no server, retries, finalizer, history. Airflow/Composer (~€350/month) when we orchestrate many external systems. |
 | Why no AWS/GCP/Azure account? | Snowflake runs on Google Cloud; its stages are our object storage, and GitHub Actions is our serverless compute. A separate bucket would add an account, IAM and notifications with no benefit at our volume (doc 03 §5). |
 | Why is the hive feed micro-batch and not streaming? | The scales report every 4 h and the decision is weekly; streaming would add an always-on client for no business value. |
 | What if a file is loaded twice? | INC-001: COPY load metadata + MERGE on keys → silver/gold unchanged (tested). |
@@ -48,4 +48,4 @@
 | Where are the secrets? | 2 private keys and 1 passphrase, only in GitHub encrypted secrets; service users have no password; the state is encrypted. |
 | What does it cost? | ≈ €15/month (prototype) = €3.50 per weekly decision; ≈ €200/month at 10×; monitored daily (FinOps views, Snowflake Budget); capped by the resource monitor; GitHub spending limit $0. |
 | Why not Fivetran? | 3-year TCO (docs/09): cheap at our MAR but no connector for our 4 APIs and no real streaming; we'd adopt it (or Openflow CDC) for the ERP/WMS once they are real databases. People cost dominates any licence. |
-| What is not done? | seasonal demand baseline, calibration of the flow weights, Snowflake objects in Terraform, CI deploy. |
+| What is not done? | seasonal demand baseline, calibration of the flow weights, Snowflake objects in Terraform. |

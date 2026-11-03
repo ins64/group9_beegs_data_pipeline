@@ -6,7 +6,7 @@
 
 | Phase | What we do | Where |
 |---|---|---|
-| **Inform** (visibility) | Every credit is attributed to a service (warehouse, Snowpipe, serverless alerts, data quality, storage), per day, in €. Every dbt query is tagged `beegs_dbt`. Every GCP resource carries the labels `project=beegs, managed_by=terraform`. | `OPS.FINOPS_DAILY_COST`, `OPS.FINOPS_COST_PER_RUN`, `OPS.FINOPS_UNIT_ECONOMICS`; GitHub Actions minutes in Settings → Billing |
+| **Inform** (visibility) | Every credit is attributed to a service (warehouse, Snowpipe, serverless alerts, data quality, storage), per day, in €. Every dbt query is tagged `beegs_dbt`. | `OPS.FINOPS_DAILY_COST`, `OPS.FINOPS_COST_PER_RUN`, `OPS.FINOPS_UNIT_ECONOMICS`; GitHub Actions minutes in Settings → Billing |
 | **Optimize** | XS warehouses with `AUTO_SUSPEND = 60`; serverless alerts instead of warehouse alerts (saves ~12 credits/month); incremental models (only new rows); 10-minute cache in Streamlit; extraction on GitHub Actions within the free quota. Monthly review: top 10 queries + idle share of each warehouse. | `snowflake/08_finops.sql §5` |
 | **Operate** (control) | Snowflake **Budget** (10 credits/month, forecast + e-mail, *includes serverless*), **resource monitor** (15 credits, hard suspend), **GitHub spending limit $0**, runbook to shut everything down. | `08_finops.sql §1`, `00_bootstrap_accountadmin.sql` |
 

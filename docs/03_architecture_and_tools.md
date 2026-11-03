@@ -95,7 +95,7 @@ Every bronze table carries `_source_file`, `_file_row_number` and `_loaded_at`, 
 - **Storage actually traversed:** every source lands in `@BEEGS.OPS.LANDING/<source>/…` before bronze (`_source_file` in any bronze table, `DIRECTORY(@LANDING)`).
 - **Cloud-executed processing with run evidence:**
   - GitHub Actions runs of `extract-daily` / `hive-readings` (logs, duration, status);
-  - Snowflake task history (`OPS.PIPELINE_RUN_LOG`, Snowsight → Monitoring → Task history);
+  - Snowflake task history (`OPS.PIPELINE_RUN_LOG`, Snowsight → Transformation → Tasks);
   - dbt project runs (Snowsight → Transformation → dbt projects);
   - Snowpipe `COPY_HISTORY`.
 - **IaC with protected state:** `terraform/snowflake` declares the warehouses, the database, 4 schemas, 3 functional roles and the role hierarchy, plus ~20 grants. The state is encrypted (AES-GCM, enforced) and stored in `@BEEGS_INFRA.TFSTATE.STATE` (BEEGS_ADMIN only); the CI concurrency group acts as the lock. The only manual step is `snowflake/00_bootstrap_accountadmin.sql` (what needs ACCOUNTADMIN).

@@ -46,7 +46,7 @@ python ../../scripts/verify_against_answer_key.py                          # rec
    3. the backtest of 2026-03-30;
    4. alerts and DMFs.
 7. Attach the resource monitor, **as ACCOUNTADMIN**: `ALTER WAREHOUSE BEEGS_PIPELINE_WH SET RESOURCE_MONITOR = BEEGS_MONTHLY_RM;` (same for `BEEGS_BI_WH`).
-8. **Streamlit:** Snowsight → Projects → Streamlit → *+ Streamlit App* in `BEEGS.GOLD`, warehouse `BEEGS_BI_WH`. Paste `streamlit/coverage_app.py` and share the app with the role `BEEGS_PURCHASING`.
+8. **Streamlit:** Snowsight → Streamlit → *+ Streamlit App* in `BEEGS.GOLD`, warehouse `BEEGS_BI_WH`. Paste `streamlit/coverage_app.py` and share the app with the role `BEEGS_PURCHASING`.
 
 ## 3. Daily operations (automatic)
 
@@ -54,7 +54,7 @@ python ../../scripts/verify_against_answer_key.py                          # rec
 |---|---|---|
 | 04:17 (fallback 05:47) | GitHub Actions `extract-daily`: container runs `internal` then `apis` → PUT to `@OPS.LANDING`, then Snowpipe for lab files | GitHub → Actions → extract-daily (logs, duration) |
 | every 4 h (:17) | `hive-readings`: last 4 h of readings → stage → Snowpipe | Actions → hive-readings; `SELECT SYSTEM$PIPE_STATUS('BEEGS.OPS.PIPE_HIVE_EVENTS');` |
-| 06:30 | task graph T_ROOT → LOAD_BATCH → CHECK_COMPLETE → DBT_BUILD → FINALIZER | Snowsight → Monitoring → Task history (graph); `SELECT * FROM BEEGS.OPS.PIPELINE_RUN_LOG ORDER BY finished_at DESC;` |
+| 06:30 | task graph T_ROOT → LOAD_BATCH → CHECK_COMPLETE → DBT_BUILD → FINALIZER | Snowsight → Transformation → Tasks (graph); `SELECT * FROM BEEGS.OPS.PIPELINE_RUN_LOG ORDER BY finished_at DESC;` |
 | 07:30 | alert A_COVERAGE_RED → Head of Sourcing | `ALERT_HISTORY` |
 | every 2 h | alert A_HIVE_FEED_STALE → data team | `ALERT_HISTORY` |
 | continuous | Budget forecast + resource monitor | Snowsight → Admin → Cost management |
