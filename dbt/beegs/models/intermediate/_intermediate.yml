@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: int_order_lines_asof
+    description: Order book as known on the decision date (latest valid version of each line updated on or before as_of_date).
+    columns:
+      - name: order_line_id
+        data_tests: [unique, not_null]
+  - name: int_declarations_asof
+    description: Harvest declarations as known on the decision date.
+    columns:
+      - name: declaration_id
+        data_tests: [unique, not_null]
+  - name: int_lab_pass_rate
+    description: Lab pass rate per variety over the last 365 days (default 0.90 under 20 results).
+    columns:
+      - name: variety_code
+        data_tests: [unique, not_null]
+      - name: pass_rate
+        data_tests: [not_null, non_negative]
+  - name: int_beekeeper_reliability
+    description: Delivered / declared kg per beekeeper over 365 days (capped at 1.2, default 0.90).
+    columns:
+      - name: beekeeper_id
+        data_tests: [unique, not_null]
+  - name: int_hive_daily
+    description: Median weight per hive per day and daily gain (harvest drops > 5 kg excluded).
+  - name: int_apiary_flow_weekly
+    description: Nectar-flow index per apiary, variety and week of the flow window (hive scales 50 %, REAL weather 30 %, REAL GBIF bloom 20 %).
+  - name: int_flow_factor_asof
+    description: Average flow index of the current season's observed weeks, applied to open declarations (1.0 if none).
+  - name: int_horizon_weeks
+    description: The 8 ISO weeks after the decision date.
+  - name: int_supply_position
+    description: Released, pending-lab and blocked kg per variety on the decision date + lab pass rate.
+    columns:
+      - name: variety_code
+        data_tests: [unique, not_null]
+      - name: released_kg
+        data_tests: [non_negative]
+  - name: int_expected_intake_weekly
+    description: Expected arrivals per variety and horizon week (open declarations x reliability x flow factor).
+  - name: int_demand_weekly
+    description: B2B demand (max of confirmed and 13-week baseline) and B2C reserve per variety and horizon week.
+  - name: int_price_references
+    description: Partner price (REAL ECB FX conversion) and spot import price (REAL Eurostat + FranceAgriMer premium) per variety.

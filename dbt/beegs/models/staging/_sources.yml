@@ -1,0 +1,47 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Raw tables loaded by Snowflake (COPY INTO task / Snowpipe) from the GCS landing zone. Never modified by dbt.
+    database: "{{ 'BEEGS' if target.type == 'snowflake' else target.database }}"
+    schema: bronze
+    loaded_at_field: _loaded_at
+    # Daily sources must be < 26 h old (warn) / < 50 h (error): one missed daily run is a warning, two is an incident.
+    freshness:
+      warn_after: {count: 26, period: hour}
+      error_after: {count: 50, period: hour}
+    tables:
+      - name: ERP_ORDER_LINES_RAW
+        description: "ERP export of B2B call-off order lines and B2C webshop lines changed during the day (JSONL). Internal system (simulated)."
+      - name: ERP_CUSTOMERS_RAW
+        description: "ERP customer master, weekly full snapshot (CSV). Internal (simulated)."
+        freshness: {warn_after: {count: 8, period: day}, error_after: {count: 15, period: day}}
+      - name: BEEKEEPERS_RAW
+        description: "Beekeeper portal master data, weekly full snapshot (CSV). PERSONAL DATA: email, phone, IBAN."
+        freshness: {warn_after: {count: 8, period: day}, error_after: {count: 15, period: day}}
+      - name: HARVEST_DECLARATIONS_RAW
+        description: "Beekeeper portal: expected harvest declared by each partner beekeeper, rows changed during the day (CSV)."
+        freshness: null      # only changes in spring/summer: no freshness expectation
+      - name: LAB_RESULTS_RAW
+        description: "Analyses of each received lot by 2 partner labs (moisture, HMF, pollen origin, C4 sugar, verdict). CSV via Snowpipe."
+        freshness: null      # files only exist when lots are received (season)
+      - name: WMS_STOCK_RAW
+        description: "Warehouse management system: full snapshot of every lot (kg remaining, status) every day (CSV)."
+      - name: HIVE_EVENTS_RAW
+        description: "IoT hive scales (24 hives on 12 apiaries), a reading every 4 h. Pub/Sub -> GCS -> Snowpipe. At-least-once delivery."
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 24, period: hour}
+      - name: WEATHER_DAILY_RAW
+        description: "REAL data - Open-Meteo historical weather API (ERA5 reanalysis), daily, at each apiary's coordinates."
+      - name: WEATHER_FORECAST_RAW
+        description: "REAL data - Open-Meteo forecast API, 8 days ahead, at each apiary."
+      - name: FX_RATES_RAW
+        description: "REAL data - Frankfurter API = European Central Bank reference rates (EUR base; HUF, RON, USD, PLN). Working days only."
+        freshness: {warn_after: {count: 4, period: day}, error_after: {count: 7, period: day}}
+      - name: GBIF_BLOOM_RAW
+        description: "REAL data - GBIF occurrence API: monthly counts of observations of the 8 honey plants in FR/HU/RO (bloom signal)."
+        freshness: {warn_after: {count: 8, period: day}, error_after: {count: 15, period: day}}
+      - name: EUROSTAT_HONEY_IMPORTS_RAW
+        description: "REAL data - Eurostat Comext DS-045409, product 0409 natural honey, EU27 imports from extra-EU partners, monthly (manual export)."
+        freshness: {warn_after: {count: 45, period: day}, error_after: {count: 75, period: day}}

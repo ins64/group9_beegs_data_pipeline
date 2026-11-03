@@ -1,0 +1,10 @@
+# LOCAL DEVELOPMENT ONLY (free, offline): DuckDB file built by scripts/local_load_duckdb.py
+#   cd dbt/beegs && dbt build --profiles-dir ../profiles_local --target local
+beegs:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: ../../data/beegs_local.duckdb
+      schema: silver
+      threads: 4

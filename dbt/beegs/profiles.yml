@@ -1,0 +1,14 @@
+# Used by dbt Projects on Snowflake (prod). The task runs as its owner role: no password here, ever.
+# Local development uses ../profiles_local/profiles.yml (DuckDB) instead: dbt --profiles-dir ../profiles_local
+beegs:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: ""        # ignored by dbt Projects on Snowflake (runs inside the account)
+      user: ""
+      role: BEEGS_PIPELINE
+      warehouse: BEEGS_PIPELINE_WH
+      database: BEEGS
+      schema: SILVER
+      threads: 4

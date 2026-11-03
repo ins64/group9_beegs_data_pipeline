@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: stg_erp__order_lines
+    data_tests:
+      - recent_reject_share: {max_share: 0.05, days: 3}
+    description: Every version of every ERP order line, typed and checked. Incremental (merge on order_line_version_key). reject_reason NOT NULL = quarantined.
+    columns:
+      - name: order_line_version_key
+        data_tests: [unique, not_null]
+      - name: reject_reason
+        data_tests:
+          - accepted_values:
+              values: ['missing_key', 'invalid_updated_at', 'unknown_variety', 'invalid_quantity', 'implausible_quantity', 'invalid_delivery_date', 'unknown_status', 'unknown_channel']
+  - name: stg_erp__customers
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+  - name: stg_portal__beekeepers
+    description: PERSONAL DATA (email, phone). IBAN not propagated.
+    columns:
+      - name: beekeeper_id
+        data_tests: [unique, not_null]
+  - name: stg_portal__harvest_declarations
+    data_tests:
+      - recent_reject_share: {max_share: 0.05, days: 3}
+    columns:
+      - name: beekeeper_id
+        data_tests:
+          - relationships: {to: ref('stg_portal__beekeepers'), field: beekeeper_id}
+  - name: stg_lims__lab_results
+    data_tests:
+      - recent_reject_share: {max_share: 0.05, days: 3}
+    columns:
+      - name: sample_id
+        data_tests: [unique, not_null]
+      - name: lot_id
+        description: Must exist in the warehouse (a lab result for an unknown lot = mix-up of samples).
+        data_tests:
+          - relationships:
+              to: ref('stg_wms__stock_snapshots')
+              field: lot_id
+              config: {severity: warn, where: "reject_reason is null"}
+  - name: stg_wms__stock_snapshots
+    description: Daily WMS snapshot, one row per lot per day. Incremental (merge on snapshot_date + lot_id).
+    data_tests:
+      - recent_reject_share: {max_share: 0.05, days: 3}
+      - unique_combination:
+          columns: [snapshot_date, lot_id]
+  - name: stg_iot__hive_events
+    data_tests:
+      - recent_reject_share: {max_share: 0.05, days: 3}
+    description: Hive scale readings deduplicated on event_id (Pub/Sub at-least-once). Incremental.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+  - name: stg_meteo__weather_daily
+    description: REAL Open-Meteo daily weather per apiary (latest extraction wins).
+    data_tests:
+      - unique_combination:
+          columns: [apiary_id, weather_date]
+    columns:
+      - name: apiary_id
+        data_tests:
+          - relationships: {to: ref('apiaries'), field: apiary_id}
+  - name: stg_meteo__weather_forecast
+    description: REAL Open-Meteo 8-day forecast per apiary (latest run).
+  - name: stg_ecb__fx_rates
+    description: REAL ECB reference rates (units of currency per EUR).
+    data_tests:
+      - unique_combination:
+          columns: [rate_date, currency]
+    columns:
+      - name: eur_rate
+        data_tests: [not_null, non_negative]
+  - name: stg_gbif__bloom_monthly
+    description: REAL GBIF monthly observation counts per honey plant and country.
+  - name: stg_eurostat__honey_imports
+    description: REAL Eurostat EU27 extra-EU honey imports per partner and month, with unit value EUR/kg.
+  - name: quarantine
+    description: Every rejected row of every source with its reason. Owners fix the source; nothing is dropped silently.
